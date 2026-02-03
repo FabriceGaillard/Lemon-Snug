@@ -46,86 +46,44 @@ function hasPriorityKeyword(content) {
   return text.includes('petit ratou') || text.includes('lemon slug');
 }
 
-function isPureHugMessage(content) {
-  const text = normalize(content).replace(/[^\p{L}\s]/gu, '');
-  const words = text.split(/\s+/).filter(Boolean);
-
-  // trop long
-  if (words.length > 4) return false;
-
-  // random ici
-  if (!shouldRandomReply()) return false;
-
-  // mot "calin" avec répétitions
-  return words.some((word) => /^c+a+l+i+n+$/.test(word));
-}
-
-function isQuestionHug(content) {
-  const text = normalize(content);
-
-  const hasCalin = /c+a+l+i+n+/.test(text);
-  const hasQuestionMark = content.includes('?');
-
-  return hasCalin && hasQuestionMark;
-}
-
-function isHugAddressedToRatou(content) {
-  const text = normalize(content);
-
-  const hasCalin = /c+a+l+i+n+/.test(text);
-  const hasName = text.includes('petit ratou') || text.includes('lemon slug');
-
-  return hasCalin && hasName;
-}
-
 // ======================
 // TEXTES
 // ======================
 const SNUG_INTERJECT = [
-  // existantes
   'câlin aussi 🥺',
-  "j'ai le droit à un calin moi aussi ? 😶",
-  'et moi euh ! 😳',
-  'câlin pour moi 🥺',
-  'moi aussi, un tout petit, promis 😶',
+  'moi aussi 🥺',
+  'et moi ? 🥺',
+  'moi aussi, un peu 🥺',
+  'câlin pour moi aussi 🥺',
+  'je peux avoir un câlin aussi ? 🥺',
+  'un petit câlin pour moi ? 🥺',
+  'si jamais, je veux bien un câlin 🥺',
+  'je veux bien venir pour le câlin 😶',
+  'je peux me joindre au câlin ? 🥺',
+  'je dérange pas si je prends un câlin ? 🥺',
+  'je peux attendre, mais j’en veux bien un 🥺',
+  'juste un petit câlin, si c’est ok 🥺',
+  'je prends pas beaucoup de place, promis 🥺',
+  'je peux être là aussi ? 🥺',
+  'est-ce que je peux avoir un câlin ? 🥺',
+  'je veux bien un câlin moi aussi 🥺',
+  'un câlin aussi, s’il te plaît 🥺',
+  'je peux avoir ma part de câlin ? 🥺',
+  'ça serait possible pour moi aussi ? 🥺',
 
-  'hé… moi aussi peut-être ? 🥺',
-  'un petit câlin par ici ? 😶',
-  'euh… j’peux venir ? 😳',
-  'juste un, après j’arrête 😶',
-  'je prends pas beaucoup de place 🥺',
+  'je veux pas forcer, mais moi aussi 🥺',
+  'si ça gêne pas, un câlin pour moi 🥺',
+  'je peux passer aussi ? 🥺',
+  'je m’incruste un peu ? 🥺',
+  'je peux rester là pour le câlin ? 🥺',
 
-  '… moi aussi 🥺',
-  'si jamais il en reste 😶',
-  'je demande pas grand-chose 😳',
-  'juste un petit 🥺',
-  'je veux bien attendre mon tour 😶',
-
-  // nouvelles — très discrètes
-  'je regarde… et peut-être moi aussi 🥺',
-  'si c’est pas trop demander 😶',
-  'je dérange pas hein 😳',
-  'je peux me glisser là ? 🥺',
-  'je fais tout petit 😶',
-
-  'je suis là… au cas où 🥺',
-  'si y a une place 😶',
-  'je viens pas souvent 😳',
-  'juste de passage 🥺',
-  'je reste au bord 😶',
-
-  // nouvelles — un peu plus expressives mais safe
-  'bon… moi aussi alors 🥺',
-  'ça a l’air sympa 😶',
-  'je dis pas non 😳',
-  'ok mais doucement 🥺',
-  'je veux bien essayer 😶',
-
-  'je lève la patte 🥺',
-  'si jamais… moi 😶',
-  'je suis prêt 😳',
-  'je peux attendre encore 🥺',
-  'je prends ce qu’il y a 😶',
+  'c’est bizarre si je regarde ? 😶',
+  'je fais pas peur, hein ? 😶',
+  'je voulais pas espionner 😶',
+  'je savais pas quand parler 😶',
+  'je vous dérange pas trop ? 😶',
+  'je regarde, mais j’aimerais bien venir 😶',
+  'je reste dans le coin. pour l’instant 😶',
 ];
 
 const SNUG_RECEIVE = [
@@ -179,9 +137,17 @@ const SNUG_RECEIVE = [
   'bon… viens… je suis prêt 🫂',
   'je dis oui sans réfléchir 🥺',
   'ça fait longtemps que j’en voulais un 😶',
-  'ok… mais après je souris 😳',
+  'ok… mais après je fais pipi 😳',
   'merci… je m’accroche un peu 🥺',
   '🥺🫂 je rends le câlin',
+];
+
+const SNUG_GIVE = [
+  'ok… je vais faire un câlin à %USER% 🥺🫂',
+  'viens là %USER% 🫂',
+  'un câlin tout doux pour %USER% 😶🫂',
+  'je me glisse vers %USER% pour un câlin 🥺',
+  'hop… câlin déposé pour %USER% 🫂🥺',
 ];
 
 // ======================
@@ -202,24 +168,50 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   const content = message.content;
+  const hasCalin = /c+a+l+i+n+/.test(content);
+  const isQuestion = content.includes('?');
+  const priority = hasPriorityKeyword(content);
+  const hasMention = message.mentions.users.size > 0;
 
-  // 👀 priorité ABSOLUE
-  if (isQuestionHug(content)) {
+  // ======================
+  // 2️⃣ PAS DE CÂLIN → RIEN
+  // ======================
+  if (!hasCalin) return;
+
+  const target = message.mentions.users.first();
+  if (hasMention && priority) {
+    let reply = '';
+    console.log(target.id, client.user.id);
+    if (target.id === client.user.id) {
+      reply = "Méééé, c'est à toi que je veux faire un calin euh 🥺";
+    } else {
+      reply = pick(SNUG_GIVE).replace('%USER%', `<@${target.id}>`);
+    }
+    await message.reply(reply);
+    return;
+  }
+
+  // ======================
+  // 3️⃣ QUESTION + PRIORITÉ
+  // ======================
+  if (isQuestion && priority) {
     await message.reply('👀');
     return;
   }
 
-  const priority = hasPriorityKeyword(content);
-  const isPureHug = isPureHugMessage(content);
+  // ======================
+  // 4️⃣ CÂLIN ADRESSÉ AU BOT
+  // ======================
+  if (priority) {
+    await message.reply(pick(SNUG_RECEIVE));
+    return;
+  }
 
-  if (!priority && !isPureHug) return;
-
-  const addressed = isHugAddressedToRatou(content);
-
-  try {
-    await message.reply(lemonSnugHug(addressed));
-  } catch (err) {
-    console.error('Erreur Lemon Snug:', err);
+  // ======================
+  // 5️⃣ INTERJECTION ALÉATOIRE
+  // ======================
+  if (shouldRandomReply()) {
+    await message.reply(pick(SNUG_INTERJECT));
   }
 });
 
