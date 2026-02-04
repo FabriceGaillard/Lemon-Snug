@@ -42,7 +42,9 @@ function shouldRandomReply() {
 }
 
 function hasPriorityKeyword(content) {
-  const text = normalize(content);
+  const text = normalize(content)
+    // on enlève la ponctuation mais on garde les lettres
+    .replace(/[^\p{L}\s]/gu, '');
 
   // tout ce qui ressemble à rat / ratou / raton
   const ratRegex = /\br+a+t+o*u*n*\b/;
@@ -174,10 +176,10 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  const content = message.content;
-  const hasCalin = /c+a+l+i+n+/.test(content);
+  const content = normalize(message.content);
+  const hasCalin = /c+a+l+i+n+(s?)+/.test(content.replace(/[^\p{L}\s]/gu, ''));
   const isQuestion = content.includes('?');
-  const priority = hasPriorityKeyword(content);
+  const priority = hasPriorityKeyword(content.replace(/[^\p{L}\s]/gu, ''));
   const hasMention = message.mentions.users.size > 0;
 
   // ======================
@@ -188,7 +190,6 @@ client.on('messageCreate', async (message) => {
   const target = message.mentions.users.first();
   if (hasMention && priority) {
     let reply = '';
-    console.log(target.id, client.user.id);
     if (target.id === client.user.id) {
       reply = "Méééé, c'est à toi que je veux faire un calin euh 🥺";
     } else {
@@ -217,7 +218,7 @@ client.on('messageCreate', async (message) => {
   // ======================
   // 5️⃣ INTERJECTION ALÉATOIRE
   // ======================
-  if (shouldRandomReply()) {
+  if (shouldRandomReply() && content.split(' ').length < 5) {
     await message.reply(pick(SNUG_INTERJECT));
   }
 });
